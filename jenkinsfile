@@ -1,0 +1,71 @@
+pipeline {
+    agent any
+    environment {
+        GIT_URL = 'https://github.com/nikitajalkote/SampleMicroserviceApplication.git'
+        GIT_BRANCH = 'main'
+    }
+    tools {
+        maven 'Maven 3.9.6'
+    }
+
+    stages {
+        stage('Hello') {
+            steps {
+                echo 'Hello World'
+            }
+        }
+        stage ('Initialize') {
+            steps {
+                sh '''
+                    echo "PATH = ${PATH}"
+                    echo "M2_HOME = ${M2_HOME}"
+                ''' 
+            }
+        }
+        stage('git_repo_cloning') {
+            steps {
+                git branch: env.GIT_BRANCH , url: env.GIT_URL
+            }
+        }
+        stage('Build') { 
+            steps {
+                sh 'mvn clean verify -DskipITs=true'
+            }
+        }
+        stage('Test'){
+            steps{
+                sh 'mvn test'
+            }
+        }
+        stage('Artifact'){
+            steps{
+                sh 'mvn package'
+            }
+        }
+        stage('Deployment'){
+            steps{
+                sshagent(credentials:['13.58.172.92']){
+                    sh '''
+                        scp -o StrictHostKeyChecking=no -r ${WORKSPACE}/* ubuntu@13.58.172.92:/home/ubuntu/
+                     '''
+                }
+            }
+        }
+    }
+    post {
+        success {
+            emailext (
+                subject: "Jenkins Build Successful: ${currentBuild.fullDisplayName}",
+                body: "The build was successful. It's ready for deployment.",
+                to: 'nikitajalkote.nj@gmail.com'
+            )
+        }
+        failure {
+            emailext (
+                subject: "Jenkins Build Failed: ${currentBuild.fullDisplayName}",
+                body: "The build failed. Please check the Jenkins console for details.",
+                to: 'nikitajalkote.nj@gmail.com'
+            )
+        }
+    }
+}
